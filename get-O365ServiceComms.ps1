@@ -16,36 +16,51 @@ get-O365ServiceComms.ps1 in Office365_Service_Comms_2SCP Repo - DL Cooper - Univ
     Instructions:
         Create AzureAD App with 'Office 365 Management APis' Permissions:
                         ServiceHealth.Read / Type: Application / Admin Consent Required: Yes
+
+            Call with splats or 
         Edit $APIauthSettings hashtable with AzureAD App information
         Edit $SCPauthSettings hashtable with target SCP host information
 
 
 #>
 #endregion
+param(
+    # API Auth Settings Splat - not mandatory - edit below if not providing via script call
+    [Parameter(Mandatory = $false)]
+    [hashtable]
+    $APIAuthSettings,
+    # SCP Auth Settings splat - not mandatory - edit directly in script below if not providing via script call
+    [Parameter(Mandatory = $false)]
+    [hashtable]
+    $SCPauthSettings
+)
 
 #region Globals
 
 ## for export to SCP target
 if (!(import-module WinSCP)) { install-module WinSCP; import-module WinSCP }
 
-# Settings used for URL builds and Auth Token retrieval
-$APIauthSettings = @{
-
-    "TenantDomain" = "contoso.com"
-    "Tenant"       = "12345678-9abc-defg-hijk-lmnopqrstuvw"
-    "ClientID"     = "wvutsrqp-onml-kjih-gfed-cba987654321"
-    "redirectUri"  = "urn:ietf:wg:oauth:2.0:oob"
-    "clientSecret" = "ObtainSecurely"
+if (!($APIAuthSettings)) {
+    # Settings used for URL builds and Auth Token retrieval
+    $global:APIauthSettings = @{
+        "TenantDomain" = "contoso.com"
+        "Tenant"       = "12345678-9abc-defg-hijk-lmnopqrstuvw"
+        "ClientID"     = "wvutsrqp-onml-kjih-gfed-cba987654321"
+        "redirectUri"  = "urn:ietf:wg:oauth:2.0:oob"
+        "clientSecret" = "ObtainSecurely"
+    }
 }
 
-$SCPauthSettings = @{
-    #if SFTP needed instead of SCP, see UseSCP function options
-    "hostName"              = "SCPHostName.Some.Host"
-    "portNumber"            = "22"
-    "userName"              = "someGreatUser"
-    "password"              = "ObtainSecurly"
-    "SshHostKeyFingerprint" = "ecdsa-sha2-nistp256 256 aa:bb:cc:dd:ee:ff:gg:hh:ii:jj:00:11:22:33:44:55"
-    "remotePutDirectory"    = "/home/someGreatUser/"
+if (!($SCPauthSettings)) {
+    $global:SCPauthSettings = @{
+        #if SFTP needed instead of SCP, see UseSCP function options
+        "hostName"              = "SCPHostName.Some.Host"
+        "portNumber"            = "22"
+        "userName"              = "someGreatUser"
+        "password"              = "ObtainSecurly"
+        "SshHostKeyFingerprint" = "ecdsa-sha2-nistp256 256 aa:bb:cc:dd:ee:ff:gg:hh:ii:jj:00:11:22:33:44:55"
+        "remotePutDirectory"    = "/home/someGreatUser/"
+    }
 }
 
 #URLs to Run
@@ -184,6 +199,8 @@ function UseSCP {
 
         # Setup session options
         $sessionOptions = New-Object WinSCP.SessionOptions -Property @{
+            #winscp.exe path if needed (not in local PATH, etc)
+            #ExecutablePath = "C:\Program Files (x86)\WinSCP"
             #Protocol = [WinSCP.Protocol]::Sftp
             Protocol              = [WinSCP.Protocol]::Scp
             HostName              = $SCPauthSettings.hostName
@@ -241,10 +258,18 @@ $reportCollection = @()
 $messageCenterURLProcessCount = 0
 foreach ($messageCenterURL in $messageCenterURLs.Keys) {
     $messageCenterURLProcessCount++
+    $messageCenterURLsKeysCount = ($messageCenterURLs.Keys | measure).Count
+
+    Write-Progress -Activity "Processing URLs - $messageCenterURL" -CurrentOperation "$messageCenterURLProcessCount of $messageCenterURLsKeysCount" -Status 'Progress->' -Id 0 -PercentComplete (($messageCenterURLProcessCount / $messageCenterURLsKeysCount) * 100 )
 
     $thisPull = @(get-serviceCommsInfo -URL $messageCenterURLs[$messageCenterURL])
 
+    $thisPullProcessCount = 0
     foreach ($thisPullEntry in $thisPull) {
+        $thisPullProcessCount++
+        $thisPullCount = ($thisPull | measure).Count
+
+        Write-Progress -Activity "Processing Records" -CurrentOperation "$messageCenterURL - $thisPullProcessCount of $thisPullCount" -Status 'Progress' -id 1 -ParentId 0 -PercentComplete (($thisPullProcessCount / $thisPullCount) * 100)
 
         #Adds Delim after each record
         Add-Member -InputObject $thisPullEntry -MemberType NoteProperty -Name Delim -Value $global:Delim
@@ -253,8 +278,12 @@ foreach ($messageCenterURL in $messageCenterURLs.Keys) {
 
     }
 
+    Write-Progress -Activity "Processing Records" -CurrentOperation "$messageCenterURL - $thisPullProcessCount of $thisPullCount" -Status "Complete" -id 1 -ParentId 0 -Completed
+
+
 }
 
+Write-Progress -Activity "Processing URLs" -CurrentOperation "$messageCenterURLProcessCount of $messageCenterURLsKeysCount" -Status "Complete" -Id 0 -Completed
 
 #endregion
 
@@ -272,6 +301,10 @@ UseSCP -eventsfile $exportTXT -ErrorAction Inquire
 
 # remove local file
 #remove-item $exportTXT
+
+#cleanup globals
+remove-variable APIauthSettings
+remove-variable SCPauthSettings
 
 #set $formatEnumerationLimit back to original value
 $FormatEnumerationLimit = $formatEnumPre
