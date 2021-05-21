@@ -210,7 +210,7 @@ function get-serviceCommsInfo {
 
     $ServCommsInfo = Invoke-RestMethod -Method Get -Uri $thisURL.Uri -Headers $authHeader -ErrorVariable GetServiceCommsErr -ContentType "application/json"
 
-    if ($GetServiceCommsErr) { return $GetGroupInfoViaGUIDError }
+    if ($GetServiceCommsErr) { return $GetServiceCommsErr }
     else { return $ServCommsInfo.value }
 
 }
