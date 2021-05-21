@@ -64,24 +64,26 @@ if (!($APIAuthSplat)) {
     }
 }
 
-if ($SCPauthSplat) { 
+if ($UseSCPtoSend) {
+
+    if ($SCPauthSplat) { 
     
-    $global:SCPauthSettings = $SCPauthSplat 
-}
-if (!($SCPauthSplat)) {
-    write-host -f green "No SCP Auth Settings provided, using settings in script"
+        $global:SCPauthSettings = $SCPauthSplat 
+    }
+    if (!($SCPauthSplat)) {
+        write-host -f green "No SCP Auth Settings provided, using settings in script"
     
-    $global:SCPauthSettings = @{
-        #if SFTP needed instead of SCP, see UseSCP function options
-        "hostName"              = "SCPHostName.Some.Host"
-        "portNumber"            = "22"
-        "userName"              = "someGreatUser"
-        "password"              = "ObtainSecurly"
-        "SshHostKeyFingerprint" = "ecdsa-sha2-nistp256 256 aa:bb:cc:dd:ee:ff:gg:hh:ii:jj:00:11:22:33:44:55"
-        "remotePutDirectory"    = "/home/someGreatUser/"
+        $global:SCPauthSettings = @{
+            #if SFTP needed instead of SCP, see UseSCP function options
+            "hostName"              = "SCPHostName.Some.Host"
+            "portNumber"            = "22"
+            "userName"              = "someGreatUser"
+            "password"              = "ObtainSecurly"
+            "SshHostKeyFingerprint" = "ecdsa-sha2-nistp256 256 aa:bb:cc:dd:ee:ff:gg:hh:ii:jj:00:11:22:33:44:55"
+            "remotePutDirectory"    = "/home/someGreatUser/"
+        }
     }
 }
-
 #URLs to Run
 $messageCenterURLs = @{
 
@@ -148,7 +150,7 @@ function get-accesstoken {
         write-output "Could not retrieve Auth Token"
         # Exception is stored in the automatic variable _
         write-output $InvokeError
-        BREAK
+        EXIT 
     }
   
 }
@@ -315,9 +317,13 @@ Write-Progress -Activity "Processing URLs" -CurrentOperation "$messageCenterURLP
 #region Export
 
 #export to local TXT file as needed for Target (SCP) processing
+write-host -f white -b black ""
+write-host -f DarkMagenta -b black "------------------ EXPORT ------------------"
 $reportCollection | out-file $exportTXT -Encoding ASCII -ErrorAction Inquire
 write-host -f Magenta "Report Collection exported to:"
 write-host -f white -b DarkMagenta $($exportTXT)
+write-host -f DarkMagenta -b black "------------------ EXPORT ------------------"
+write-host -f white -b black ""
 
 #Use SCP to transer to target
 if ($UseSCPtoSend) {
@@ -329,10 +335,6 @@ if ($UseSCPtoSend) {
 
 # remove local file
 #remove-item $exportTXT
-
-#cleanup globals
-remove-variable APIauthSettings
-remove-variable SCPauthSettings
 
 #set $formatEnumerationLimit back to original value
 $FormatEnumerationLimit = $formatEnumPre
