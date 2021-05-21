@@ -45,8 +45,7 @@ param(
 
 #region Globals
 
-## for export to SCP target
-if (!(import-module WinSCP)) { install-module WinSCP; import-module WinSCP }
+
 
 if ($APIAuthSplat) { 
     $global:APIauthSettings = $APIAuthSplat 
@@ -65,6 +64,8 @@ if (!($APIAuthSplat)) {
 }
 
 if ($UseSCPtoSend) {
+    ## for export to SCP target
+    if (!(import-module WinSCP)) { install-module WinSCP; import-module WinSCP }
 
     if ($SCPauthSplat) { 
     
