@@ -108,6 +108,7 @@ if (!(Test-Path ($thisPath + "\exports\"))) {
 }
 
 [string]$fileDateTime = (get-date -Format yyyyMMMdd_hhmmss_)
+$tenantDomainFileName = ($APIauthSettings.TenantDomain).Replace(".", "_")
 
 #Log path for start-trascript recording, if needed
 if ($StartTranscript) {
@@ -118,8 +119,6 @@ if ($StartTranscript) {
 
 #Export path for local File storage
 $thisExportsPath = $thisPath + "\exports\"
-
-$tenantDomainFileName = ($APIauthSettings.TenantDomain).Replace(".", "_")
 $exportTXT = $thisExportsPath + $fileDateTime + "$($tenantDomainFileName)_ServiceComms.txt"
 # $exportCSV = $thisExportsPath + $fileDateTime + "$($tenant)_ServiceComms.csv"
 
