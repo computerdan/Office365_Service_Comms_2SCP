@@ -28,11 +28,19 @@ param(
     # API Auth Settings Splat - not mandatory - edit below if not providing via script call
     [Parameter(Mandatory = $false)]
     [hashtable]
-    $APIAuthSettings,
+    $APIAuthSplat,
     # SCP Auth Settings splat - not mandatory - edit directly in script below if not providing via script call
     [Parameter(Mandatory = $false)]
     [hashtable]
-    $SCPauthSettings
+    $SCPauthSplat,
+    # Start Transcript
+    [Parameter(Mandatory = $false)]
+    [bool]
+    $StartTranscript = $false,
+    # UseSCP - True if using SCP to send to target system (as configured)
+    [Parameter(Mandatory = $false)]
+    [bool]
+    $UseSCPtoSend = $false 
 )
 
 #region Globals
@@ -40,7 +48,12 @@ param(
 ## for export to SCP target
 if (!(import-module WinSCP)) { install-module WinSCP; import-module WinSCP }
 
-if (!($APIAuthSettings)) {
+if ($APIAuthSplat) { 
+    $global:APIauthSettings = $APIAuthSplat 
+}
+if (!($APIAuthSplat)) {
+    write-host -f green "No GraphAPI Auth Settings provided, using settings in script"
+
     # Settings used for URL builds and Auth Token retrieval
     $global:APIauthSettings = @{
         "TenantDomain" = "contoso.com"
@@ -51,7 +64,13 @@ if (!($APIAuthSettings)) {
     }
 }
 
-if (!($SCPauthSettings)) {
+if ($SCPauthSplat) { 
+    
+    $global:SCPauthSettings = $SCPauthSplat 
+}
+if (!($SCPauthSplat)) {
+    write-host -f green "No SCP Auth Settings provided, using settings in script"
+    
     $global:SCPauthSettings = @{
         #if SFTP needed instead of SCP, see UseSCP function options
         "hostName"              = "SCPHostName.Some.Host"
@@ -85,12 +104,18 @@ if (!(Test-Path ($thisPath + "\exports\"))) {
     New-Item -ItemType Directory -Force -Path ($thisPath + "\exports\")
 }
 
+[string]$fileDateTime = (get-date -Format yyyyMMMdd_hhmmss_)
+
 #Log path for start-trascript recording, if needed
-$thisLogPath = $thisPath + "\logs\"
+if ($StartTranscript) {
+    $thisLogPath = $thisPath + "\logs\"
+    $thisTranscriptFile = $thisLogPath + $fileDateTime + "$($tenantDomainFileName)_Transcript.txt"
+    Start-Transcript -LiteralPath $thisTranscriptFile -IncludeInvocationHeader
+}
+
 #Export path for local File storage
 $thisExportsPath = $thisPath + "\exports\"
 
-[string]$fileDateTime = (get-date -Format yyyyMMMdd_hhmmss_)
 $tenantDomainFileName = ($APIauthSettings.TenantDomain).Replace(".", "_")
 $exportTXT = $thisExportsPath + $fileDateTime + "$($tenantDomainFileName)_ServiceComms.txt"
 # $exportCSV = $thisExportsPath + $fileDateTime + "$($tenant)_ServiceComms.csv"
@@ -291,10 +316,13 @@ Write-Progress -Activity "Processing URLs" -CurrentOperation "$messageCenterURLP
 
 #export to local TXT file as needed for Target (SCP) processing
 $reportCollection | out-file $exportTXT -Encoding ASCII -ErrorAction Inquire
+write-host -f Magenta "Report Collection exported to:"
+write-host -f white -b DarkMagenta $($exportTXT)
 
 #Use SCP to transer to target
-UseSCP -eventsfile $exportTXT -ErrorAction Inquire
-
+if ($UseSCPtoSend) {
+    UseSCP -eventsfile $exportTXT -ErrorAction Inquire
+}
 #endregion
 
 #region Cleanup
@@ -308,4 +336,6 @@ remove-variable SCPauthSettings
 
 #set $formatEnumerationLimit back to original value
 $FormatEnumerationLimit = $formatEnumPre
+
+if ($StartTranscript) { Stop-Transcript }
 #endregion
